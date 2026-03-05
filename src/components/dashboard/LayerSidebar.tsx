@@ -1,7 +1,6 @@
-import { useState } from "react";
 import { motion } from "framer-motion";
 
-interface Layer {
+export interface Layer {
   id: string;
   icon: string;
   label: string;
@@ -9,44 +8,41 @@ interface Layer {
   category: "military" | "infrastructure" | "events" | "environment" | "intelligence";
 }
 
-const initialLayers: Layer[] = [
-  { id: "intel-hotspots", icon: "🎯", label: "Intel Hotspots", active: true, category: "intelligence" },
-  { id: "conflict-zones", icon: "⚔", label: "Conflict Zones", active: true, category: "military" },
-  { id: "military-bases", icon: "🏛", label: "Military Bases", active: false, category: "military" },
-  { id: "nuclear-sites", icon: "☢", label: "Nuclear Sites", active: false, category: "infrastructure" },
-  { id: "spaceports", icon: "🚀", label: "Spaceports", active: false, category: "infrastructure" },
-  { id: "undersea-cables", icon: "🔌", label: "Undersea Cables", active: false, category: "infrastructure" },
-  { id: "pipelines", icon: "🛢", label: "Pipelines", active: false, category: "infrastructure" },
-  { id: "ai-datacenters", icon: "🖥", label: "AI Data Centers", active: false, category: "infrastructure" },
-  { id: "military-activity", icon: "✈", label: "Military Activity", active: true, category: "military" },
-  { id: "ship-traffic", icon: "🚢", label: "Ship Traffic", active: false, category: "events" },
-  { id: "trade-routes", icon: "⚓", label: "Trade Routes", active: false, category: "events" },
-  { id: "aviation", icon: "✈", label: "Aviation", active: false, category: "events" },
-  { id: "protests", icon: "📢", label: "Protests", active: false, category: "events" },
-  { id: "armed-conflict", icon: "⚔", label: "Armed Conflict Events", active: false, category: "events" },
-  { id: "displacement", icon: "👥", label: "Displacement Flows", active: false, category: "events" },
-  { id: "climate-anomalies", icon: "🌫", label: "Climate Anomalies", active: false, category: "environment" },
-  { id: "weather-alerts", icon: "⛈", label: "Weather Alerts", active: true, category: "environment" },
-  { id: "internet-outages", icon: "📡", label: "Internet Outages", active: true, category: "intelligence" },
-  { id: "cyber-threats", icon: "🛡", label: "Cyber Threats", active: true, category: "intelligence" },
-  { id: "natural-events", icon: "🌋", label: "Natural Events", active: true, category: "environment" },
-  { id: "fires", icon: "🔥", label: "Fires", active: true, category: "environment" },
-  { id: "strategic-waterways", icon: "⚓", label: "Strategic Waterways", active: true, category: "military" },
-  { id: "economic-centers", icon: "💰", label: "Economic Centers", active: true, category: "intelligence" },
-  { id: "critical-minerals", icon: "💎", label: "Critical Minerals", active: false, category: "intelligence" },
-  { id: "gps-jamming", icon: "📡", label: "GPS Jamming", active: false, category: "intelligence" },
-  { id: "day-night", icon: "🌓", label: "Day/Night", active: false, category: "environment" },
+export const initialLayers: Layer[] = [
+  { id: "intel-hotspots", icon: "INT", label: "Intel Hotspots", active: true, category: "intelligence" },
+  { id: "conflict-zones", icon: "WAR", label: "Conflict Zones", active: true, category: "military" },
+  { id: "military-bases", icon: "BAS", label: "Military Bases", active: false, category: "military" },
+  { id: "nuclear-sites", icon: "NUC", label: "Nuclear Sites", active: true, category: "infrastructure" },
+  { id: "spaceports", icon: "SPC", label: "Spaceports", active: false, category: "infrastructure" },
+  { id: "undersea-cables", icon: "CAB", label: "Undersea Cables", active: false, category: "infrastructure" },
+  { id: "pipelines", icon: "PIP", label: "Pipelines", active: false, category: "infrastructure" },
+  { id: "ai-datacenters", icon: "DC", label: "AI Data Centers", active: false, category: "infrastructure" },
+  { id: "military-activity", icon: "AIR", label: "Military Activity", active: true, category: "military" },
+  { id: "ship-traffic", icon: "SEA", label: "Ship Traffic", active: false, category: "events" },
+  { id: "trade-routes", icon: "TRD", label: "Trade Routes", active: false, category: "events" },
+  { id: "aviation", icon: "FLY", label: "Aviation", active: false, category: "events" },
+  { id: "protests", icon: "PRT", label: "Protests", active: false, category: "events" },
+  { id: "armed-conflict", icon: "ACF", label: "Armed Conflict Events", active: false, category: "events" },
+  { id: "displacement", icon: "DSP", label: "Displacement Flows", active: false, category: "events" },
+  { id: "climate-anomalies", icon: "CLM", label: "Climate Anomalies", active: false, category: "environment" },
+  { id: "weather-alerts", icon: "WTH", label: "Weather Alerts", active: true, category: "environment" },
+  { id: "internet-outages", icon: "NET", label: "Internet Outages", active: true, category: "intelligence" },
+  { id: "cyber-threats", icon: "CYB", label: "Cyber Threats", active: true, category: "intelligence" },
+  { id: "natural-events", icon: "NAT", label: "Natural Events", active: true, category: "environment" },
+  { id: "fires", icon: "FIR", label: "Fires", active: true, category: "environment" },
+  { id: "strategic-waterways", icon: "WAT", label: "Strategic Waterways", active: true, category: "military" },
+  { id: "economic-centers", icon: "ECO", label: "Economic Centers", active: true, category: "intelligence" },
+  { id: "critical-minerals", icon: "MIN", label: "Critical Minerals", active: false, category: "intelligence" },
+  { id: "gps-jamming", icon: "GPS", label: "GPS Jamming", active: false, category: "intelligence" },
+  { id: "day-night", icon: "D/N", label: "Day/Night", active: false, category: "environment" },
 ];
 
-const LayerSidebar = () => {
-  const [layers, setLayers] = useState(initialLayers);
+interface LayerSidebarProps {
+  layers: Layer[];
+  onToggleLayer: (id: string) => void;
+}
 
-  const toggleLayer = (id: string) => {
-    setLayers((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, active: !l.active } : l))
-    );
-  };
-
+const LayerSidebar = ({ layers, onToggleLayer }: LayerSidebarProps) => {
   return (
     <aside className="w-48 bg-panel border-r border-panel-border overflow-y-auto flex-shrink-0">
       <div className="p-2">
@@ -57,27 +53,21 @@ const LayerSidebar = () => {
           {layers.map((layer) => (
             <motion.button
               key={layer.id}
-              onClick={() => toggleLayer(layer.id)}
+              onClick={() => onToggleLayer(layer.id)}
               className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
-                layer.active
-                  ? "bg-primary/10 text-foreground"
-                  : "text-muted-foreground hover:bg-secondary"
+                layer.active ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-secondary"
               }`}
               whileTap={{ scale: 0.98 }}
             >
               <div
                 className={`w-3 h-3 rounded-sm border flex items-center justify-center text-[8px] ${
-                  layer.active
-                    ? "bg-primary border-primary"
-                    : "border-muted-foreground/40"
+                  layer.active ? "bg-primary border-primary" : "border-muted-foreground/40"
                 }`}
               >
-                {layer.active && "✓"}
+                {layer.active && "*"}
               </div>
-              <span className="text-[10px]">{layer.icon}</span>
-              <span className="text-[10px] uppercase tracking-wide truncate font-display">
-                {layer.label}
-              </span>
+              <span className="text-[10px] tabular-nums">{layer.icon}</span>
+              <span className="text-[10px] uppercase tracking-wide truncate font-display">{layer.label}</span>
             </motion.button>
           ))}
         </div>
