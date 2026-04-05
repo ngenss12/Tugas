@@ -1,0 +1,24 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/worldmonitor/news",
+      "destination": "https://worldmonitor.app/api/news/v1/list-feed-digest"
+    },
+    {
+      "source": "/api/worldmonitor/youtube/live",
+      "destination": "https://worldmonitor.app/api/youtube/live"
+    },
+    {
+      "source": "/api/newsapi/:path*",
+      "destination": "https://newsapi.org/:path*"
+    },
+    {
+      "source": "/api/gnews/:path*",
+      "destination": "https://gnews.io/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
