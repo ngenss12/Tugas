@@ -9,6 +9,18 @@ const worldMonitorProxy = {
   secure: true,
 };
 
+const newsApiProxy = {
+  target: "https://newsapi.org",
+  changeOrigin: true,
+  secure: true,
+};
+
+const gNewsProxy = {
+  target: "https://gnews.io",
+  changeOrigin: true,
+  secure: true,
+};
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -28,6 +40,14 @@ export default defineConfig(({ mode }) => ({
         rewrite: (path) =>
           path.replace(/^\/api\/worldmonitor\/youtube\/live/, "/api/youtube/live"),
       },
+      "/api/newsapi": {
+        ...newsApiProxy,
+        rewrite: (path) => path.replace(/^\/api\/newsapi/, ""),
+      },
+      "/api/gnews": {
+        ...gNewsProxy,
+        rewrite: (path) => path.replace(/^\/api\/gnews/, ""),
+      },
     },
   },
   preview: {
@@ -41,6 +61,14 @@ export default defineConfig(({ mode }) => ({
         ...worldMonitorProxy,
         rewrite: (path) =>
           path.replace(/^\/api\/worldmonitor\/youtube\/live/, "/api/youtube/live"),
+      },
+      "/api/newsapi": {
+        ...newsApiProxy,
+        rewrite: (path) => path.replace(/^\/api\/newsapi/, ""),
+      },
+      "/api/gnews": {
+        ...gNewsProxy,
+        rewrite: (path) => path.replace(/^\/api\/gnews/, ""),
       },
     },
   },

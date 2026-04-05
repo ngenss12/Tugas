@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { ExternalLink, RefreshCw, Volume2, VolumeX } from "lucide-react";
 
 type NewsSeverity = "critical" | "high" | "medium" | "low";
-type TimeRange = "6h" | "24h" | "7d";
+type TimeRange = "2h" | "4h" | "6h" | "8h" | "10h" | "12h" | "14h" | "16h" | "18h" | "20h" | "22h" | "24h";
 
 interface NewsItem {
   source: string;
@@ -13,6 +13,8 @@ interface NewsItem {
   category: string;
   link: string;
   publishedAt: number;
+  importanceScore: number;
+  corroborationCount: number;
 }
 
 interface LiveChannel {
@@ -47,6 +49,8 @@ const FALLBACK_NEWS: NewsItem[] = [
     category: "conflict",
     link: "#",
     publishedAt: Date.now() - 2 * 60 * 60 * 1000,
+    importanceScore: 72,
+    corroborationCount: 3,
   },
   {
     source: "AP News",
@@ -56,6 +60,8 @@ const FALLBACK_NEWS: NewsItem[] = [
     category: "conflict",
     link: "#",
     publishedAt: Date.now() - 4 * 60 * 60 * 1000,
+    importanceScore: 88,
+    corroborationCount: 7,
   },
   {
     source: "Bloomberg",
@@ -65,6 +71,8 @@ const FALLBACK_NEWS: NewsItem[] = [
     category: "market",
     link: "#",
     publishedAt: Date.now() - 7 * 60 * 60 * 1000,
+    importanceScore: 55,
+    corroborationCount: 2,
   },
   {
     source: "Al Jazeera",
@@ -74,6 +82,8 @@ const FALLBACK_NEWS: NewsItem[] = [
     category: "conflict",
     link: "#",
     publishedAt: Date.now() - 11 * 60 * 60 * 1000,
+    importanceScore: 65,
+    corroborationCount: 4,
   },
   {
     source: "Financial Times",
@@ -83,6 +93,8 @@ const FALLBACK_NEWS: NewsItem[] = [
     category: "market",
     link: "#",
     publishedAt: Date.now() - 16 * 60 * 60 * 1000,
+    importanceScore: 48,
+    corroborationCount: 1,
   },
   {
     source: "BBC World",
@@ -92,6 +104,8 @@ const FALLBACK_NEWS: NewsItem[] = [
     category: "humanitarian",
     link: "#",
     publishedAt: Date.now() - 22 * 60 * 60 * 1000,
+    importanceScore: 42,
+    corroborationCount: 2,
   },
   {
     source: "CNBC",
@@ -101,13 +115,24 @@ const FALLBACK_NEWS: NewsItem[] = [
     category: "market",
     link: "#",
     publishedAt: Date.now() - 26 * 60 * 60 * 1000,
+    importanceScore: 30,
+    corroborationCount: 1,
   },
 ];
 
 const RANGE_TO_HOURS: Record<TimeRange, number> = {
+  "2h": 2,
+  "4h": 4,
   "6h": 6,
+  "8h": 8,
+  "10h": 10,
+  "12h": 12,
+  "14h": 14,
+  "16h": 16,
+  "18h": 18,
+  "20h": 20,
+  "22h": 22,
   "24h": 24,
-  "7d": 168,
 };
 
 const SEVERITY_STYLES: Record<NewsSeverity, string> = {
@@ -175,6 +200,8 @@ const normalizeNewsItem = (raw: Record<string, unknown>, fallbackCategory: strin
   const threatLevel = isRecord(raw.threat) ? raw.threat.level : undefined;
   const severity = normalizeSeverity(raw.severity, threatLevel);
   const publishedAt = toEpochMillis(raw.publishedAt);
+  const importanceScore = typeof raw.importanceScore === "number" ? Math.round(raw.importanceScore) : 0;
+  const corroborationCount = typeof raw.corroborationCount === "number" ? raw.corroborationCount : 0;
 
   return {
     source,
@@ -184,6 +211,8 @@ const normalizeNewsItem = (raw: Record<string, unknown>, fallbackCategory: strin
     link,
     publishedAt,
     ageHours: ageHoursFromTimestamp(publishedAt),
+    importanceScore,
+    corroborationCount,
   };
 };
 
@@ -224,17 +253,147 @@ const normalizeNewsPayload = (payload: unknown): NewsItem[] => {
     }
   }
 
-  const deduped = new Map<string, NewsItem>();
-  for (const item of items) {
-    const key = `${item.source}-${item.title}-${item.publishedAt}`;
-    if (!deduped.has(key)) {
-      deduped.set(key, item);
+  return items;
+};
+
+const SEVERITY_KEYWORDS: Record<NewsSeverity, string[]> = {
+  critical: ["war", "attack", "nuclear", "explosion", "coup", "massacre", "invasion", "airstrike", "bombing"],
+  high: ["conflict", "sanctions", "military", "protest", "strike", "emergency", "missile", "troops", "hostage"],
+  medium: ["tension", "dispute", "talks", "concern", "threat", "warning", "opposition", "rally", "unrest"],
+  low: [],
+};
+
+const severityFromTitle = (title: string): NewsSeverity => {
+  const lower = title.toLowerCase();
+  for (const level of ["critical", "high", "medium"] as NewsSeverity[]) {
+    if (SEVERITY_KEYWORDS[level].some((kw) => lower.includes(kw))) return level;
+  }
+  return "low";
+};
+
+const normalizeNewsApiPayload = (payload: unknown): NewsItem[] => {
+  if (!isRecord(payload) || !Array.isArray(payload.articles)) return [];
+
+  const items: NewsItem[] = [];
+  for (const article of payload.articles) {
+    if (!isRecord(article)) continue;
+    const title = String(article.title ?? "").trim();
+    if (!title || title === "[Removed]") continue;
+
+    const source = isRecord(article.source)
+      ? String(article.source.name ?? "Unknown").trim()
+      : "Unknown";
+    const link = String(article.url ?? "#").trim() || "#";
+    const publishedAt = article.publishedAt
+      ? new Date(String(article.publishedAt)).getTime()
+      : 0;
+
+    items.push({
+      source,
+      title,
+      link,
+      publishedAt,
+      ageHours: ageHoursFromTimestamp(publishedAt),
+      severity: severityFromTitle(title),
+      category: "global",
+      importanceScore: 0,
+      corroborationCount: 0,
+    });
+  }
+  return items;
+};
+
+interface RssFeed {
+  name: string;
+  url: string;
+  category: string;
+}
+
+const RSS_FEEDS: RssFeed[] = [
+  { name: "Reuters", url: "https://feeds.reuters.com/reuters/topNews", category: "global" },
+  { name: "BBC World", url: "https://feeds.bbci.co.uk/news/world/rss.xml", category: "global" },
+  { name: "AP News", url: "https://feeds.apnews.com/rss/apf-topnews", category: "global" },
+  { name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml", category: "conflict" },
+  { name: "The Guardian", url: "https://www.theguardian.com/world/rss", category: "global" },
+];
+
+const normalizeRssPayload = (payload: unknown, feedName: string, feedCategory: string): NewsItem[] => {
+  if (!isRecord(payload) || payload.status !== "ok" || !Array.isArray(payload.items)) return [];
+
+  const items: NewsItem[] = [];
+  for (const entry of payload.items) {
+    if (!isRecord(entry)) continue;
+    const title = String(entry.title ?? "").trim();
+    if (!title) continue;
+
+    const link = String(entry.link ?? entry.guid ?? "#").trim() || "#";
+    const publishedAt = entry.pubDate
+      ? new Date(String(entry.pubDate)).getTime()
+      : 0;
+
+    items.push({
+      source: feedName,
+      title,
+      link,
+      publishedAt,
+      ageHours: ageHoursFromTimestamp(publishedAt),
+      severity: severityFromTitle(title),
+      category: feedCategory,
+      importanceScore: 0,
+      corroborationCount: 0,
+    });
+  }
+  return items;
+};
+
+const normalizeGNewsPayload = (payload: unknown): NewsItem[] => {
+  if (!isRecord(payload) || !Array.isArray(payload.articles)) return [];
+
+  const items: NewsItem[] = [];
+  for (const article of payload.articles) {
+    if (!isRecord(article)) continue;
+    const title = String(article.title ?? "").trim();
+    if (!title) continue;
+
+    const source = isRecord(article.source)
+      ? String(article.source.name ?? "Unknown").trim()
+      : "Unknown";
+    const link = String(article.url ?? "#").trim() || "#";
+    const publishedAt = article.publishedAt
+      ? new Date(String(article.publishedAt)).getTime()
+      : 0;
+
+    items.push({
+      source,
+      title,
+      link,
+      publishedAt,
+      ageHours: ageHoursFromTimestamp(publishedAt),
+      severity: severityFromTitle(title),
+      category: "global",
+      importanceScore: 0,
+      corroborationCount: 0,
+    });
+  }
+  return items;
+};
+
+const fetchRssFeeds = async (): Promise<NewsItem[]> => {
+  const results = await Promise.allSettled(
+    RSS_FEEDS.map(async (feed) => {
+      const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}&count=30`;
+      const payload = await fetchJsonWithTimeout(url, 12000);
+      return normalizeRssPayload(payload, feed.name, feed.category);
+    }),
+  );
+
+  const items: NewsItem[] = [];
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      items.push(...result.value);
     }
   }
-
-  return Array.from(deduped.values())
-    .sort((a, b) => b.publishedAt - a.publishedAt)
-    .slice(0, 120);
+  return items;
 };
 
 const fetchJsonWithTimeout = async (url: string, timeoutMs: number): Promise<unknown> => {
@@ -252,28 +411,91 @@ const fetchJsonWithTimeout = async (url: string, timeoutMs: number): Promise<unk
   }
 };
 
-const loadNewsFeed = async (): Promise<{ items: NewsItem[]; source: string; error: string | null }> => {
-  const endpoints = [
-    { url: "/api/worldmonitor/news?variant=full&lang=en", source: "proxy" },
-    { url: "https://worldmonitor.app/api/news/v1/list-feed-digest?variant=full&lang=en", source: "worldmonitor" },
-  ] as const;
-
-  for (const endpoint of endpoints) {
-    try {
-      const payload = await fetchJsonWithTimeout(endpoint.url, 15000);
-      const items = normalizeNewsPayload(payload);
-      if (items.length > 0) {
-        return { items, source: endpoint.source, error: null };
-      }
-    } catch {
-      continue;
+const deduplicateAndSort = (items: NewsItem[]): NewsItem[] => {
+  const deduped = new Map<string, NewsItem>();
+  for (const item of items) {
+    const key = `${item.source}-${item.title.slice(0, 60)}`;
+    const existing = deduped.get(key);
+    // keep item with higher importanceScore, or newer if equal
+    if (!existing || item.importanceScore > existing.importanceScore ||
+      (item.importanceScore === existing.importanceScore && item.publishedAt > existing.publishedAt)) {
+      deduped.set(key, item);
     }
+  }
+  return Array.from(deduped.values())
+    .sort((a, b) => {
+      if (b.importanceScore !== a.importanceScore) return b.importanceScore - a.importanceScore;
+      return b.publishedAt - a.publishedAt;
+    })
+    .slice(0, 120);
+};
+
+const loadNewsFeed = async (): Promise<{ items: NewsItem[]; source: string; error: string | null }> => {
+  const newsApiKey = import.meta.env.VITE_NEWS_API_KEY as string | undefined;
+  const allItems: NewsItem[] = [];
+  const activeSources: string[] = [];
+
+  const gNewsKey = import.meta.env.VITE_GNEWS_API_KEY as string | undefined;
+
+  // Run WorldMonitor + RSS + GNews in parallel
+  const [wmResult, rssItems, gNewsItems] = await Promise.allSettled([
+    (async () => {
+      const wmEndpoints = [
+        { url: "/api/worldmonitor/news?variant=full&lang=en", label: "worldmonitor" },
+        { url: "https://worldmonitor.app/api/news/v1/list-feed-digest?variant=full&lang=en", label: "worldmonitor" },
+      ];
+      for (const ep of wmEndpoints) {
+        try {
+          const payload = await fetchJsonWithTimeout(ep.url, 15000);
+          const items = normalizeNewsPayload(payload);
+          if (items.length > 0) return { items, label: ep.label };
+        } catch { continue; }
+      }
+      return null;
+    })(),
+    fetchRssFeeds(),
+    (async () => {
+      if (!gNewsKey) return [];
+      const url = `/api/gnews/api/v4/top-headlines?lang=en&max=50&token=${encodeURIComponent(gNewsKey)}`;
+      const payload = await fetchJsonWithTimeout(url, 12000);
+      return normalizeGNewsPayload(payload);
+    })(),
+  ]);
+
+  if (wmResult.status === "fulfilled" && wmResult.value) {
+    allItems.push(...wmResult.value.items);
+    activeSources.push(wmResult.value.label);
+  }
+  if (rssItems.status === "fulfilled" && rssItems.value.length > 0) {
+    allItems.push(...rssItems.value);
+    activeSources.push("rss");
+  }
+  if (gNewsItems.status === "fulfilled" && gNewsItems.value.length > 0) {
+    allItems.push(...gNewsItems.value);
+    activeSources.push("gnews");
+  }
+
+  // If all parallel sources failed, try NewsAPI as fallback
+  if (allItems.length === 0 && newsApiKey) {
+    try {
+      const url = `/api/newsapi/v2/top-headlines?language=en&pageSize=100&apiKey=${encodeURIComponent(newsApiKey)}`;
+      const payload = await fetchJsonWithTimeout(url, 15000);
+      const items = normalizeNewsApiPayload(payload);
+      if (items.length > 0) {
+        allItems.push(...items);
+        activeSources.push("newsapi");
+      }
+    } catch { /* fall through */ }
+  }
+
+  if (allItems.length === 0) {
+    return { items: FALLBACK_NEWS, source: "fallback", error: "Live feed unavailable. Showing fallback headlines." };
   }
 
   return {
-    items: FALLBACK_NEWS,
-    source: "fallback",
-    error: "Live feed unavailable. Showing fallback headlines.",
+    items: deduplicateAndSort(allItems),
+    source: activeSources.join("+"),
+    error: null,
   };
 };
 
@@ -544,9 +766,9 @@ const LiveNewsPanel = () => {
               onChange={(event) => setSelectedRange(event.target.value as TimeRange)}
               className="text-[9px] bg-secondary border border-panel-border rounded px-1.5 py-0.5 text-foreground"
             >
-              <option value="6h">6h</option>
-              <option value="24h">24h</option>
-              <option value="7d">7d</option>
+              {(["2h","4h","6h","8h","10h","12h","14h","16h","18h","20h","22h","24h"] as TimeRange[]).map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
             </select>
 
             <div className="text-[8px] text-muted-foreground text-right">
@@ -563,12 +785,19 @@ const LiveNewsPanel = () => {
             )}
 
             {visibleNews.map((item, index) => (
-              <motion.article
+              <motion.a
                 key={`${item.source}-${item.publishedAt}-${index}`}
+                href={item.link && item.link !== "#" ? item.link : undefined}
+                target="_blank"
+                rel="noopener noreferrer"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.02 }}
-                className="bg-card border border-panel-border rounded px-2 py-1.5"
+                className={`block bg-card border border-panel-border rounded px-2 py-1.5 ${
+                  item.link && item.link !== "#"
+                    ? "cursor-pointer hover:border-foreground/30 hover:bg-card/80 transition-colors"
+                    : "cursor-default"
+                }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[9px] text-foreground font-semibold truncate">{item.source}</span>
@@ -577,20 +806,38 @@ const LiveNewsPanel = () => {
                   </span>
                 </div>
 
-                <a
-                  href={item.link || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block mt-1 text-[10px] text-foreground/90 hover:text-foreground leading-tight"
-                >
+                <p className="mt-1 text-[10px] text-foreground/90 leading-tight">
                   {item.title}
-                </a>
+                </p>
 
                 <div className="mt-1 flex items-center justify-between text-[8px] text-muted-foreground">
-                  <span>{formatAge(item.ageHours)}</span>
-                  <span className="uppercase tracking-wider">{item.category}</span>
+                  <div className="flex items-center gap-2">
+                    <span>{formatAge(item.ageHours)}</span>
+                    {item.corroborationCount > 1 && (
+                      <span className="text-emerald-400/80" title={`Confirmed by ${item.corroborationCount} sources`}>
+                        ✦{item.corroborationCount}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {item.importanceScore > 0 && (
+                      <span
+                        className={`font-mono ${
+                          item.importanceScore >= 75
+                            ? "text-red-400/80"
+                            : item.importanceScore >= 50
+                            ? "text-amber-400/80"
+                            : "text-muted-foreground"
+                        }`}
+                        title="Importance score (0–100)"
+                      >
+                        {item.importanceScore}
+                      </span>
+                    )}
+                    <span className="uppercase tracking-wider">{item.category}</span>
+                  </div>
                 </div>
-              </motion.article>
+              </motion.a>
             ))}
 
             {visibleNews.length === 0 && (
