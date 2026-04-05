@@ -440,17 +440,11 @@ const loadNewsFeed = async (): Promise<{ items: NewsItem[]; source: string; erro
   // Run WorldMonitor + RSS + GNews in parallel
   const [wmResult, rssItems, gNewsItems] = await Promise.allSettled([
     (async () => {
-      const wmEndpoints = [
-        { url: "/api/worldmonitor/news?variant=full&lang=en", label: "worldmonitor" },
-        { url: "https://worldmonitor.app/api/news/v1/list-feed-digest?variant=full&lang=en", label: "worldmonitor" },
-      ];
-      for (const ep of wmEndpoints) {
-        try {
-          const payload = await fetchJsonWithTimeout(ep.url, 15000);
-          const items = normalizeNewsPayload(payload);
-          if (items.length > 0) return { items, label: ep.label };
-        } catch { continue; }
-      }
+      try {
+        const payload = await fetchJsonWithTimeout("/api/worldmonitor/news?variant=full&lang=en", 15000);
+        const items = normalizeNewsPayload(payload);
+        if (items.length > 0) return { items, label: "worldmonitor" };
+      } catch { /* fall through */ }
       return null;
     })(),
     fetchRssFeeds(),
@@ -512,18 +506,13 @@ const resolveLiveVideo = async (channel: LiveChannel): Promise<LiveVideoResult> 
   }
 
   const encodedHandle = encodeURIComponent(channel.handle);
-  const endpoints = [
-    { url: `/api/worldmonitor/youtube/live?channel=${encodedHandle}`, source: "proxy" as const },
-    { url: `https://worldmonitor.app/api/youtube/live?channel=${encodedHandle}`, source: "worldmonitor" as const },
-  ];
 
-  for (const endpoint of endpoints) {
-    try {
-      const payload = await fetchJsonWithTimeout(endpoint.url, 12000);
-      if (!isRecord(payload)) {
-        continue;
-      }
-
+  try {
+    const payload = await fetchJsonWithTimeout(
+      `/api/worldmonitor/youtube/live?channel=${encodedHandle}`,
+      12000,
+    );
+    if (isRecord(payload)) {
       const videoId = typeof payload.videoId === "string" ? payload.videoId : null;
       const isLive = Boolean(payload.isLive);
 
@@ -537,13 +526,11 @@ const resolveLiveVideo = async (channel: LiveChannel): Promise<LiveVideoResult> 
         return {
           videoId,
           isLive,
-          source: endpoint.source,
+          source: "worldmonitor" as const,
         };
       }
-    } catch {
-      continue;
     }
-  }
+  } catch { /* fall through to fallback */ }
 
   liveVideoCache.set(channel.handle, {
     videoId: channel.fallbackVideoId,
